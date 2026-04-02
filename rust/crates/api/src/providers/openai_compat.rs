@@ -18,9 +18,9 @@ pub const DEFAULT_XAI_BASE_URL: &str = "https://api.x.ai/v1";
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 const REQUEST_ID_HEADER: &str = "request-id";
 const ALT_REQUEST_ID_HEADER: &str = "x-request-id";
-const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_millis(200);
-const DEFAULT_MAX_BACKOFF: Duration = Duration::from_secs(2);
-const DEFAULT_MAX_RETRIES: u32 = 2;
+const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_secs(5);
+const DEFAULT_MAX_BACKOFF: Duration = Duration::from_secs(60);
+const DEFAULT_MAX_RETRIES: u32 = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OpenAiCompatConfig {
@@ -92,11 +92,24 @@ impl OpenAiCompatClient {
     }
 
     pub fn from_env(config: OpenAiCompatConfig) -> Result<Self, ApiError> {
-        let Some(api_key) = read_env_non_empty(config.api_key_env)? else {
-            return Err(ApiError::missing_credentials(
-                config.provider_name,
-                config.credential_env_vars(),
-            ));
+        // vLLM / Ollama endpoints typically don't require an API key.
+        // Use a placeholder when no key is set but a base URL is configured.
+        let api_key = match read_env_non_empty(config.api_key_env)? {
+            Some(key) => key,
+            None => {
+                if read_env_non_empty(config.base_url_env)
+                    .ok()
+                    .flatten()
+                    .is_some()
+                {
+                    "no-key-required".to_string()
+                } else {
+                    return Err(ApiError::missing_credentials(
+                        config.provider_name,
+                        config.credential_env_vars(),
+                    ));
+                }
+            }
         };
         Ok(Self::new(api_key, config))
     }
@@ -885,8 +898,10 @@ fn chat_completions_endpoint(base_url: &str) -> String {
     let trimmed = base_url.trim_end_matches('/');
     if trimmed.ends_with("/chat/completions") {
         trimmed.to_string()
-    } else {
+    } else if trimmed.ends_with("/v1") {
         format!("{trimmed}/chat/completions")
+    } else {
+        format!("{trimmed}/v1/chat/completions")
     }
 }
 
@@ -1086,6 +1101,11 @@ mod tests {
         assert_eq!(
             chat_completions_endpoint("https://api.x.ai/v1/chat/completions"),
             "https://api.x.ai/v1/chat/completions"
+        );
+        // Bare host (e.g. vLLM / Ollama) gets /v1/chat/completions appended
+        assert_eq!(
+            chat_completions_endpoint("http://localhost:11434"),
+            "http://localhost:11434/v1/chat/completions"
         );
     }
 

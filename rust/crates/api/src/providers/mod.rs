@@ -168,6 +168,11 @@ pub fn detect_provider_kind(model: &str) -> ProviderKind {
     if let Some(metadata) = metadata_for_model(model) {
         return metadata.provider;
     }
+    // When OPENAI_BASE_URL is set and the model is unrecognized, prefer
+    // OpenAI-compat so that vLLM / Ollama / custom endpoints work.
+    if std::env::var("OPENAI_BASE_URL").is_ok() {
+        return ProviderKind::OpenAi;
+    }
     if anthropic::has_auth_from_env_or_saved().unwrap_or(false) {
         return ProviderKind::Anthropic;
     }

@@ -21,9 +21,9 @@ use crate::types::{MessageDeltaEvent, MessageRequest, MessageResponse, StreamEve
 pub const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
 const REQUEST_ID_HEADER: &str = "request-id";
 const ALT_REQUEST_ID_HEADER: &str = "x-request-id";
-const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_millis(200);
-const DEFAULT_MAX_BACKOFF: Duration = Duration::from_secs(2);
-const DEFAULT_MAX_RETRIES: u32 = 2;
+const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_secs(5);
+const DEFAULT_MAX_BACKOFF: Duration = Duration::from_secs(60);
+const DEFAULT_MAX_RETRIES: u32 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthSource {
