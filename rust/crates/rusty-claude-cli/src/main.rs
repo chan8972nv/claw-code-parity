@@ -5219,6 +5219,7 @@ struct AnthropicRuntimeClient {
     allowed_tools: Option<AllowedToolSet>,
     tool_registry: GlobalToolRegistry,
     progress_reporter: Option<InternalPromptProgressReporter>,
+    thinking: Option<api::ThinkingConfig>,
 }
 
 impl AnthropicRuntimeClient {
@@ -5234,6 +5235,7 @@ impl AnthropicRuntimeClient {
         let auth_source = resolve_cli_auth_source().ok();
         let client = ProviderClient::from_model_with_anthropic_auth(&model, auth_source)?
             .with_prompt_cache(PromptCache::new(session_id));
+        let thinking = thinking_config_from_env();
         Ok(Self {
             runtime: tokio::runtime::Runtime::new()?,
             client,
@@ -5243,7 +5245,35 @@ impl AnthropicRuntimeClient {
             allowed_tools,
             tool_registry,
             progress_reporter,
+            thinking,
         })
+    }
+}
+
+/// Read thinking config from CLAW_THINKING env var.
+/// Values: "adaptive", "disabled", or a number for budget_tokens (e.g. "10000").
+/// Default (unset or empty): adaptive thinking enabled.
+fn thinking_config_from_env() -> Option<api::ThinkingConfig> {
+    let value = env::var("CLAW_THINKING").unwrap_or_default();
+    let value = value.trim();
+    if value.is_empty() {
+        return Some(api::ThinkingConfig::Adaptive);
+    }
+    match value {
+        "adaptive" => Some(api::ThinkingConfig::Adaptive),
+        "disabled" => Some(api::ThinkingConfig::Disabled),
+        budget => match budget.parse::<u32>() {
+            Ok(tokens) => Some(api::ThinkingConfig::Enabled {
+                budget_tokens: tokens,
+            }),
+            Err(_) => {
+                eprintln!(
+                    "[warning] Invalid CLAW_THINKING value '{budget}'. \
+                     Use 'adaptive', 'disabled', or a number for budget_tokens."
+                );
+                Some(api::ThinkingConfig::Adaptive)
+            }
+        },
     }
 }
 
@@ -5273,6 +5303,7 @@ impl ApiClient for AnthropicRuntimeClient {
                 .then(|| filter_tool_specs(&self.tool_registry, self.allowed_tools.as_ref())),
             tool_choice: self.enable_tools.then_some(ToolChoice::Auto),
             stream: true,
+            thinking: self.thinking.clone(),
         };
 
         self.runtime.block_on(async {
