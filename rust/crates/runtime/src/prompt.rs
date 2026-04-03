@@ -524,8 +524,6 @@ fn get_simple_doing_tasks_section() -> String {
         .chain(items)
         .chain(std::iter::once("\n# Available tools".to_string()))
         .chain(tool_items)
-        .chain(std::iter::once("\n# Tool usage guidelines".to_string()))
-        .chain(tool_guidance)
         .collect::<Vec<_>>()
         .join("\n")
 }
