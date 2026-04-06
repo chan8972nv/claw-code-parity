@@ -57,7 +57,7 @@ fn max_tokens_for_model(model: &str) -> u32 {
     if model.contains("opus") {
         32_000
     } else {
-        64_000
+        32_000
     }
 }
 const DEFAULT_DATE: &str = "2026-03-31";

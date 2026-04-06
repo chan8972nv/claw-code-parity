@@ -682,6 +682,11 @@ fn build_chat_completion_request(request: &MessageRequest, config: OpenAiCompatC
         payload["tool_choice"] = openai_tool_choice(tool_choice);
     }
 
+    // Pass thinking config through for proxies that route to Claude (e.g. LiteLLM, NVIDIA NIM)
+    if let Some(thinking) = &request.thinking {
+        payload["thinking"] = serde_json::to_value(thinking).unwrap_or_default();
+    }
+
     payload
 }
 
